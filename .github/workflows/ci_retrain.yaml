@@ -10,32 +10,40 @@ jobs:
   train_and_save_model:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # 1. Check out the repository code
+      # 1. Checkout repository
+      - uses: actions/checkout@v4
 
+      # 2. Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8' # Must match the version in conda.yaml
+          python-version: '3.8'
 
+      # 3. Install dependencies
       - name: Install MLflow CLI and dependencies
         run: |
-          # Install core MLflow and all project dependencies
           pip install mlflow
-          # Ensure you have created MLProject/requirements.txt (with the protobuf fix)
-          pip install -r MLProject/requirements.txt 
+          pip install -r MLProject/requirements.txt
 
-      # 2. Run the MLflow Project and Capture Run ID (USING UNIQUE MARKER)
+      # 4. Run MLflow project and capture run ID
       - name: Run MLflow Project and Capture Run ID
-        id: run_mlflow_project 
+        id: run_mlflow_project
         run: |
-          # Use --env-manager=local instead of deprecated --no-conda
-          MLFLOW_OUTPUT=$(mlflow run ./MLProject --experiment-name "CI-Retraining-Run" --env-manager=local)
+          # Set local tracking directory
+          export MLFLOW_TRACKING_URI=$(pwd)/mlruns
+
+          # Run the MLflow project
+          MLFLOW_OUTPUT=$(mlflow run ./MLProject \
+            --experiment-name "CI-Retraining-Run" \
+            --env-manager=local \
+            --backend=local \
+            --tracking-uri $MLFLOW_TRACKING_URI)
+
           echo "$MLFLOW_OUTPUT"
-          
-          # Extract run ID using unique marker "RUN_ID::" from script output.
-          # We use awk with -F'::' to split the line specifically by the marker.
+
+          # Extract run ID using unique marker
           RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep "RUN_ID::" | awk -F'::' '{print $2}' | tr -d '[:space:]')
-          
+
           if [ -z "$RUN_ID" ]; then
             echo "Error: Failed to capture MLflow Run ID. Please ensure RUN_ID:: is printed in modelling.py."
             exit 1
@@ -44,11 +52,24 @@ jobs:
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
           echo "Captured MLflow Run ID: $RUN_ID"
 
-      # 3. Find and Upload the Artifact (Skilled 3 pts)
-      - name: Find and Upload Model Artifact to GitHub
-        uses: actions/upload-artifact@v4 
+      # 5. Locate the model artifact path
+      - name: Locate model artifact
+        id: find_model
+        run: |
+          MODEL_PATH=$(find ./mlruns -type d -path "*/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model")
+          echo "Found model path: $MODEL_PATH"
+          
+          if [ -z "$MODEL_PATH" ]; then
+            echo "Error: Model artifact not found."
+            exit 1
+          fi
+          
+          echo "model_path=$MODEL_PATH" >> $GITHUB_OUTPUT
+
+      # 6. Upload the model artifact
+      - name: Upload Model Artifact to GitHub
+        uses: actions/upload-artifact@v4
         with:
           name: retrained-model-${{ github.sha }}
-          # Path uses the captured run_id from the previous step
-          path: mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model
+          path: ${{ steps.find_model.outputs.model_path }}
           retention-days: 7
