@@ -9,5 +9,4 @@ dependencies:
   - numpy=1.22.3
   - mlflow=1.25.1
   - pip:
-    # Add any pip-specific dependencies here
-    # - your-custom-library==1.0
+    - protobuf==3.20.3
