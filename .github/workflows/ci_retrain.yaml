@@ -10,27 +10,28 @@ jobs:
   train_and_save_model:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # 1. Check out the repository code
+      - name: Check out repository code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8' # Must match the version in conda.yaml
+          python-version: '3.8'
 
       - name: Install MLflow CLI and dependencies
         run: |
-          # Install core MLflow and all project dependencies
           pip install mlflow
-          # Ensure you have created MLProject/requirements.txt
           pip install -r MLProject/requirements.txt 
 
-      # 2. Run the MLflow Project and Capture Run ID (FIXED)
       - name: Run MLflow Project and Capture Run ID
-        id: run_mlflow_project 
+        id: run_mlflow_project
         run: |
-          MLFLOW_OUTPUT=$(mlflow run ./MLProject --experiment-name "CI-Retraining-Run" --no-conda)
+          MLFLOW_OUTPUT=$(mlflow run ./MLProject --experiment-name "CI-Retraining-Run" --env-manager=local)
           echo "$MLFLOW_OUTPUT"
-          RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep 'succeeded' | awk '{print $8}' | tr -d "(')" | tr -d "'")
+
+          # Extract run ID reliably from the output
+          RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep -oE "Run \(ID '[0-9a-f]+'\) succeeded" | grep -oE "[0-9a-f]{32}")
+
           if [ -z "$RUN_ID" ]; then
             echo "Error: Failed to capture MLflow Run ID. Look at the logs for the actual error."
             exit 1
@@ -39,11 +40,21 @@ jobs:
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
           echo "Captured MLflow Run ID: $RUN_ID"
 
-      # 3. Find and Upload the Artifact (Skilled 3 pts)
-      - name: Find and Upload Model Artifact to GitHub
-        uses: actions/upload-artifact@v4 
+      - name: Check and Upload Model Artifact to GitHub
+        run: |
+          MODEL_PATH="mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model"
+          if [ -d "$MODEL_PATH" ]; then
+            echo "Uploading model from $MODEL_PATH"
+            echo "model_path=$MODEL_PATH" >> $GITHUB_ENV
+          else
+            echo "Model artifact not found at $MODEL_PATH. Skipping upload."
+            exit 0
+          fi
+
+      - name: Upload Model Artifact
+        if: env.model_path != ''
+        uses: actions/upload-artifact@v4
         with:
           name: retrained-model-${{ github.sha }}
-          # Path uses the captured run_id from the previous step
-          path: mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model
+          path: ${{ env.model_path }}
           retention-days: 7
