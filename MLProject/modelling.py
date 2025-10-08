@@ -3,38 +3,27 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
-import mlflow.sklearn 
-import os # <-- CRITICAL: Needed to read the environment variable
 
 mlflow.autolog()
 
-# Data loading and splitting
+# NOTE: If your CSV file is at the root of the repo, and your script is in MLProject/, 
+# you might need to adjust this path to '../winequality_white_preprocessing.csv' or 
+# 'winequality_white_preprocessing.csv' depending on how mlflow run handles the CWD. 
+# We'll assume this path works based on previous context.
 data = pd.read_csv('winequality_white_preprocessing.csv') 
+
 X = data.drop('quality_encoded', axis=1)
 y = data['quality_encoded']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+# === CRITICAL CHANGE: Capture the run object using 'as run' ===
+with mlflow.start_run(run_name="Basic_RandomForest_Autolog") as run:
 
-# === CRITICAL FIX: Get Run ID directly from environment variable ===
-# This is the most stable way to get the ID when running via 'mlflow run' CLI.
-RUN_ID = os.environ.get("MLFLOW_RUN_ID")
-
-if RUN_ID:
-    # Print the ID using the unique marker for the CI job to capture
-    print(f"RUN_ID::{RUN_ID}") 
-else:
-    print("Warning: MLFLOW_RUN_ID environment variable not found.")
+    # === ADDED LINE: Print the Run ID with the unique marker ===
+    print(f"RUN_ID::{run.info.run_id}") 
     
-# The model training and logging proceed normally.
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-
-predictions = model.predict(X_test)
-accuracy = accuracy_score(y_test, predictions)
-print(f"Accuracy: {accuracy}")
-    
-# === Explicitly log the model artifact (Guarantees the location for CI) ===
-mlflow.sklearn.log_model(
-    sk_model=model, 
-    artifact_path="model"
-)
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    predictions = model.predict(X_test)
+    accuracy = accuracy_score(y_test, predictions)
+    print(f"Accuracy: {accuracy}")
