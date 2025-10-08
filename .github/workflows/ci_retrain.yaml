@@ -24,28 +24,26 @@ jobs:
           # Ensure you have created MLProject/requirements.txt (with the protobuf fix)
           pip install -r MLProject/requirements.txt 
 
-      # 2. Run the MLflow Project and Capture Run ID (USING UNIQUE MARKER)
+# 2. Run the MLflow Project and Capture Run ID (USING UNIQUE MARKER)
       - name: Run MLflow Project and Capture Run ID
         id: run_mlflow_project 
         run: |
-          # === CRITICAL FIX: Force mlruns directory to be created in the repository root ===
-          export MLFLOW_TRACKING_URI=./ 
+          # CRITICAL FIX: Use file:// to avoid the .git error and ensure mlruns location
+          export MLFLOW_TRACKING_URI=file:./mlruns
           
-          # Use --env-manager=local instead of deprecated --no-conda
           MLFLOW_OUTPUT=$(mlflow run ./MLProject --experiment-name "CI-Retraining-Run" --env-manager=local)
           echo "$MLFLOW_OUTPUT"
           
-          # Extract run ID using unique marker "RUN_ID::" from script output.
+          # Extract run ID using unique marker from script output
           RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep "RUN_ID::" | awk -F'::' '{print $2}' | tr -d '[:space:]')
           
           if [ -z "$RUN_ID" ]; then
-            echo "Error: Failed to capture MLflow Run ID. Please ensure RUN_ID:: is printed in modelling.py."
+            echo "Error: Failed to capture MLflow Run ID. Look at the logs for the actual error."
             exit 1
           fi
 
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
           echo "Captured MLflow Run ID: $RUN_ID"
-
       # 2.5. DEBUG STEP: This should now succeed and list the files
       - name: Debug Artifact Directory Structure
         run: |
