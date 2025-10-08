@@ -6,7 +6,7 @@ from sklearn.metrics import accuracy_score
 
 mlflow.autolog()
 
-data = pd.read_csv('./winequality_white_preprocessing.csv') 
+data = pd.read_csv('winequality_white_preprocessing.csv') 
 
 X = data.drop('quality_encoded', axis=1)
 y = data['quality_encoded']
