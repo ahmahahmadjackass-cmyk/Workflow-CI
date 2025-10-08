@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # 1. Checkout repository
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       # 2. Set up Python
       - name: Set up Python
@@ -25,27 +26,22 @@ jobs:
           pip install mlflow
           pip install -r MLProject/requirements.txt
 
-      # 4. Run MLflow project and capture run ID
+      # 4. Run MLflow Project and Capture Run ID
       - name: Run MLflow Project and Capture Run ID
         id: run_mlflow_project
         run: |
-          # Set local tracking directory
-          export MLFLOW_TRACKING_URI=$(pwd)/mlruns
+          # Use file-based tracking URI to avoid .git issues and ensure local mlruns usage
+          export MLFLOW_TRACKING_URI=file:./mlruns
 
-          # Run the MLflow project
-          MLFLOW_OUTPUT=$(mlflow run ./MLProject \
-            --experiment-name "CI-Retraining-Run" \
-            --env-manager=local \
-            --backend=local \
-            --tracking-uri $MLFLOW_TRACKING_URI)
-
+          # Run MLflow project
+          MLFLOW_OUTPUT=$(mlflow run ./MLProject --experiment-name "CI-Retraining-Run" --env-manager=local)
           echo "$MLFLOW_OUTPUT"
 
-          # Extract run ID using unique marker
+          # Extract run ID from custom script output (must include: RUN_ID::<id>)
           RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep "RUN_ID::" | awk -F'::' '{print $2}' | tr -d '[:space:]')
 
           if [ -z "$RUN_ID" ]; then
-            echo "Error: Failed to capture MLflow Run ID. Please ensure RUN_ID:: is printed in modelling.py."
+            echo "Error: Failed to capture MLflow Run ID. Look at the logs for the actual error."
             exit 1
           fi
 
@@ -58,12 +54,12 @@ jobs:
         run: |
           MODEL_PATH=$(find ./mlruns -type d -path "*/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model")
           echo "Found model path: $MODEL_PATH"
-          
+
           if [ -z "$MODEL_PATH" ]; then
             echo "Error: Model artifact not found."
             exit 1
           fi
-          
+
           echo "model_path=$MODEL_PATH" >> $GITHUB_OUTPUT
 
       # 6. Upload the model artifact
