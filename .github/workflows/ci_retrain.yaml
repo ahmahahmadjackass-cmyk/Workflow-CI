@@ -50,5 +50,5 @@ jobs:
         with:
           name: retrained-model-${{ github.sha }}
           # Path uses the captured run_id from the previous step
-          path: ./mlruns/0/f7f5419deb834bcdb0bca18670775d91/artifacts/model
+          path: ./MLProject/mlruns/0/f7f5419deb834bcdb0bca18670775d91/artifacts/
           retention-days: 7
