@@ -30,7 +30,7 @@ jobs:
         run: |
           MLFLOW_OUTPUT=$(mlflow run ./MLProject --experiment-name "CI-Retraining-Run" --no-conda)
           echo "$MLFLOW_OUTPUT"
-          RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep 'succeeded' | awk '{print $5}' | tr -d "'")
+          RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep 'succeeded' | awk '{print $8}' | tr -d "(')" | tr -d "'")
           if [ -z "$RUN_ID" ]; then
             echo "Error: Failed to capture MLflow Run ID. Look at the logs for the actual error."
             exit 1
