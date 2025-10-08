@@ -33,7 +33,6 @@ jobs:
           echo "$MLFLOW_OUTPUT"
           
           # Extract run ID using unique marker "RUN_ID::" from script output.
-          # We use awk with -F'::' to split the line specifically by the marker.
           RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep "RUN_ID::" | awk -F'::' '{print $2}' | tr -d '[:space:]')
           
           if [ -z "$RUN_ID" ]; then
@@ -44,11 +43,24 @@ jobs:
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
           echo "Captured MLflow Run ID: $RUN_ID"
 
+      # 2.5. DEBUG STEP: List files in the run's artifact directory (NEW)
+      - name: Debug Artifact Directory Structure
+        run: |
+          RUN_PATH="mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts"
+          echo "Listing contents of: $RUN_PATH"
+          if [ -d "$RUN_PATH" ]; then
+            # Use find to recursively list all files and folders
+            find "$RUN_PATH"
+          else
+            echo "Error: Run artifact path not found: $RUN_PATH"
+            exit 1
+          fi
+          
       # 3. Find and Upload the Artifact (Skilled 3 pts)
       - name: Find and Upload Model Artifact to GitHub
         uses: actions/upload-artifact@v4 
         with:
           name: retrained-model-${{ github.sha }}
-          # FIX: Path must include /model to match the explicit logging path in modelling.py
+          # Path remains targeted at the explicit 'model' directory for now
           path: mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model 
           retention-days: 7
