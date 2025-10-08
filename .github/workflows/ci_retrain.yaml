@@ -46,9 +46,9 @@ jobs:
 
       # 3. Find and Upload the Artifact (Skilled 3 pts)
       - name: Find and Upload Model Artifact to GitHub
-        uses: actions/upload-artifact@v4 
+        uses: actions/upload-artifact@v4
         with:
           name: retrained-model-${{ github.sha }}
           # Path uses the captured run_id from the previous step
-          path: ./mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model
+          path: ./mlruns/0/f7f5419deb834bcdb0bca18670775d91/artifacts/model
           retention-days: 7
