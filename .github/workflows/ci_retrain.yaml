@@ -49,6 +49,6 @@ jobs:
         uses: actions/upload-artifact@v4 
         with:
           name: retrained-model-${{ github.sha }}
-          # Path uses the captured run_id from the previous step
-          path: mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts
+          # FIX: Path must include /model to match the explicit logging path in modelling.py
+          path: mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model 
           retention-days: 7
