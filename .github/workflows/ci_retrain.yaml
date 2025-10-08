@@ -1,0 +1,56 @@
+name: Continuous Integration - ML Retraining
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  train_and_save_model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # 1. Check out the repository code
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8' # Must match the version in conda.yaml
+
+      - name: Install MLflow CLI and dependencies
+        run: |
+          # Install core MLflow and all project dependencies
+          pip install mlflow
+          pip install -r MLProject/requirements.txt
+          # The -r MLProject/requirements.txt assumes you have a requirements.txt 
+          # file inside the MLProject folder listing: scikit-learn, pandas, numpy.
+
+      # 2. Run the MLflow Project and Capture Run ID
+      - name: Run MLflow Project and Capture Run ID
+        id: run_mlflow_project 
+        run: |
+          # Use MLflow to run the project with --no-conda and extract the Run ID.
+          # The output from 'mlflow run' contains the Run ID, which we extract using shell tools.
+          MLFLOW_OUTPUT=$(mlflow run ./MLProject --experiment-name "CI-Retraining-Run" --no-conda)
+          echo "$MLFLOW_OUTPUT"
+          
+          # Extract the Run ID using grep and awk, and save it as an output variable
+          RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep "Run ID" | awk '{print $NF}')
+          
+          if [ -z "$RUN_ID" ]; then
+            echo "Error: Failed to capture MLflow Run ID."
+            exit 1
+          fi
+          
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          echo "Captured MLflow Run ID: $RUN_ID"
+
+      # 3. Find and Upload the Artifact (Skilled 3 pts)
+      - name: Find and Upload Model Artifact to GitHub
+        uses: actions/upload-artifact@v3
+        with:
+          name: retrained-model-${{ github.sha }}
+          # The model artifact is stored locally in the mlruns directory. 
+          # Standard autologging places the model inside the run's artifact path.
+          path: mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model
+          retention-days: 7
