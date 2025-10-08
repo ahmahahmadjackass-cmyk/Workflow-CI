@@ -21,24 +21,23 @@ jobs:
         run: |
           # Install core MLflow and all project dependencies
           pip install mlflow
-          pip install -r MLProject/requirements.txt
-          # The -r MLProject/requirements.txt assumes you have a requirements.txt 
-          # file inside the MLProject folder listing: scikit-learn, pandas, numpy.
+          # Ensure you have created MLProject/requirements.txt
+          pip install -r MLProject/requirements.txt 
 
-      # 2. Run the MLflow Project and Capture Run ID
+      # 2. Run the MLflow Project and Capture Run ID (FIXED)
       - name: Run MLflow Project and Capture Run ID
         id: run_mlflow_project 
         run: |
-          # Use MLflow to run the project with --no-conda and extract the Run ID.
-          # The output from 'mlflow run' contains the Run ID, which we extract using shell tools.
+          # Execute the project and capture the full output
           MLFLOW_OUTPUT=$(mlflow run ./MLProject --experiment-name "CI-Retraining-Run" --no-conda)
           echo "$MLFLOW_OUTPUT"
           
-          # Extract the Run ID using grep and awk, and save it as an output variable
-          RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep "Run ID" | awk '{print $NF}')
+          # Use grep to find the 'Running command' line and awk to extract the ID (the 10th field),
+          # then tr to remove the single quotes. This is the robust fix.
+          RUN_ID=$(echo "$MLFLOW_OUTPUT" | grep 'Running command' | awk '{print $10}' | tr -d "'")
           
           if [ -z "$RUN_ID" ]; then
-            echo "Error: Failed to capture MLflow Run ID."
+            echo "Error: Failed to capture MLflow Run ID. Look at the logs for the actual error."
             exit 1
           fi
 
@@ -47,10 +46,9 @@ jobs:
 
       # 3. Find and Upload the Artifact (Skilled 3 pts)
       - name: Find and Upload Model Artifact to GitHub
-        uses: actions/upload-artifact@v4 # <--- To this
+        uses: actions/upload-artifact@v4 
         with:
           name: retrained-model-${{ github.sha }}
-          # The model artifact is stored locally in the mlruns directory. 
-          # Standard autologging places the model inside the run's artifact path.
+          # Path uses the captured run_id from the previous step
           path: mlruns/0/${{ steps.run_mlflow_project.outputs.run_id }}/artifacts/model
           retention-days: 7
